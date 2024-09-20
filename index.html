@@ -115,6 +115,23 @@
             right: 20px;
             z-index: 1000;
         }
+
+        /* Gaya untuk perangkat mobile */
+        @media (max-width: 768px) {
+            .main-content {
+                flex-direction: column;
+            }
+
+            .form-container,
+            .output-container {
+                width: 100%;
+                /* Lebar penuh untuk tampilan mobile */
+            }
+
+            .code-block {
+                margin-bottom: 20px;
+            }
+        }
     </style>
 </head>
 
@@ -127,50 +144,43 @@
 
         <div class="main-content">
             <!-- Form Section -->
-            <div class="col-lg-4 col-md-6 mb-4">
-                <div class="form-container">
-                    <form id="modelForm">
-                        <div class="mb-3">
-                            <label for="modelName" class="form-label">Model Name</label>
-                            <input type="text" id="modelName" class="form-control" placeholder="e.g. Request">
-                        </div>
+            <div class="form-container">
+                <form id="modelForm">
+                    <div class="mb-3">
+                        <label for="modelName" class="form-label">Model Name</label>
+                        <input type="text" id="modelName" class="form-control" placeholder="e.g. Request">
+                    </div>
 
-                        <div class="mb-3">
-                            <label for="tableName" class="form-label">Table Name</label>
-                            <input type="text" id="tableName" class="form-control" placeholder="e.g. requests">
-                        </div>
+                    <div class="mb-3">
+                        <label for="tableName" class="form-label">Table Name</label>
+                        <input type="text" id="tableName" class="form-control" placeholder="e.g. requests">
+                    </div>
 
-                        <div class="mb-3">
-                            <label for="attributes" class="form-label">Attributes (Field DataType, one per line)</label>
-                            <textarea id="attributes" class="form-control" rows="10"
-                                placeholder="e.g. name string, age integer OR name:string, age:integer"></textarea>
-                        </div>
+                    <div class="mb-3">
+                        <label for="attributes" class="form-label">Attributes (Field DataType, one per line)</label>
+                        <textarea id="attributes" class="form-control" rows="10"
+                            placeholder="e.g. name string, age integer OR name:string, age:integer"></textarea>
+                    </div>
 
-                        <button type="button" class="btn btn-primary w-100" onclick="generateModel()">Generate
-                            Models</button>
-                    </form>
-                </div>
+                    <button type="button" class="btn btn-primary w-100" onclick="generateModel()">Generate
+                        Models</button>
+                </form>
             </div>
 
             <!-- Output Section -->
-            <!-- Output Section -->
-            <div class="col-lg-8 col-md-6">
-                <div class="output-container mb-4">
-                    <!-- Sequelize Model Output -->
-                    <div class="code-block position-relative">
-                        <h3>Sequelize Model</h3>
-                        <button class="btn copy-btn" onclick="copyToClipboard('outputSequelize')">Copy Code</button>
-                        <pre><code id="outputSequelize" class="language-javascript"></code></pre>
-                    </div>
+            <div class="output-container">
+                <!-- Sequelize Model Output -->
+                <div class="code-block">
+                    <h3>Sequelize Model</h3>
+                    <button class="btn copy-btn" onclick="copyToClipboard('outputSequelize')">Copy Code</button>
+                    <pre><code id="outputSequelize" class="language-javascript"></code></pre>
                 </div>
 
-                <div class="output-container">
-                    <!-- Domain Model Output -->
-                    <div class="code-block position-relative">
-                        <h3>Domain Model</h3>
-                        <button class="btn copy-btn" onclick="copyToClipboard('outputDomain')">Copy Code</button>
-                        <pre><code id="outputDomain" class="language-javascript"></code></pre>
-                    </div>
+                <!-- Domain Model Output -->
+                <div class="code-block">
+                    <h3>Domain Model</h3>
+                    <button class="btn copy-btn" onclick="copyToClipboard('outputDomain')">Copy Code</button>
+                    <pre><code id="outputDomain" class="language-javascript"></code></pre>
                 </div>
             </div>
         </div>
