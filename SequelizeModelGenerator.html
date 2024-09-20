@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sequelize & Domain Model Generator</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.25.0/themes/prism-okaidia.min.css" rel="stylesheet" />
+    <style>
+        body {
+            /* background: url('https://via.placeholder.com/1920x1080') no-repeat center center fixed; */
+            background-size: cover;
+            transition: background-color 0.3s ease;
+        }
+
+        .container-fluid {
+            max-width: 1400px;
+            padding: 20px;
+        }
+
+        h2 {
+            color: #343a40;
+            font-weight: bold;
+        }
+
+        .main-content {
+            display: flex;
+            gap: 20px;
+        }
+
+        .form-container {
+            width: 35%;
+            background-color: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            transition: background-color 0.3s ease, color 0.3s ease;
+        }
+
+        .output-container {
+            width: 65%;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .code-block {
+            width: 100%;
+            position: relative;
+            background-color: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            transition: background-color 0.3s ease, color 0.3s ease;
+        }
+
+        .code-block h3 {
+            margin-bottom: 10px;
+        }
+
+        pre {
+            max-height: 400px;
+            overflow-y: auto;
+            background-color: #f0f0f0;
+            padding: 15px;
+            border-radius: 8px;
+            transition: background-color 0.3s ease;
+        }
+
+        button.copy-btn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background-color: #17a2b8;
+            color: white;
+        }
+
+        .btn-primary {
+            background-color: #007bff;
+        }
+
+        .btn-primary:hover {
+            background-color: #0056b3;
+        }
+
+        .form-label {
+            font-weight: bold;
+        }
+
+        /* Dark mode styles */
+        body.dark-mode {
+            background-color: #121212;
+            background-image: none;
+        }
+
+        body.dark-mode h2 {
+            color: #f8f9fa;
+        }
+
+        body.dark-mode .form-container,
+        body.dark-mode .code-block {
+            background-color: #333;
+            color: #f8f9fa;
+        }
+
+        body.dark-mode pre {
+            background-color: #222;
+            color: #f8f9fa;
+        }
+
+        .dark-mode-toggle {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+        }
+    </style>
+</head>
+
+<body class="dark-mode">
+
+
+    <div class="container-fluid">
+        <button class="btn btn-secondary dark-mode-toggle" onclick="toggleDarkMode()">Toggle Dark Mode</button>
+        <h2 class="text-center mb-4">Sequelize & Domain Model Generator</h2>
+
+        <div class="main-content">
+            <!-- Form Section -->
+            <div class="form-container">
+                <form id="modelForm">
+                    <div class="mb-3">
+                        <label for="modelName" class="form-label">Model Name</label>
+                        <input type="text" id="modelName" class="form-control" placeholder="e.g. Request">
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="tableName" class="form-label">Table Name</label>
+                        <input type="text" id="tableName" class="form-control" placeholder="e.g. requests">
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="attributes" class="form-label">Attributes (Field DataType, one per line)</label>
+                        <textarea id="attributes" class="form-control" rows="10"
+                            placeholder="e.g. name string, age integer OR name:string, age:integer"></textarea>
+                    </div>
+
+                    <button type="button" class="btn btn-primary w-100" onclick="generateModel()">Generate
+                        Models</button>
+                </form>
+            </div>
+
+            <!-- Output Section -->
+            <div class="output-container">
+                <!-- Sequelize Model Output -->
+                <div class="code-block">
+                    <h3>Sequelize Model</h3>
+                    <button class="btn copy-btn" onclick="copyToClipboard('outputSequelize')">Copy Code</button>
+                    <pre><code id="outputSequelize" class="language-javascript"></code></pre>
+                </div>
+
+                <!-- Domain Model Output -->
+                <div class="code-block">
+                    <h3>Domain Model</h3>
+                    <button class="btn copy-btn" onclick="copyToClipboard('outputDomain')">Copy Code</button>
+                    <pre><code id="outputDomain" class="language-javascript"></code></pre>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.25.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.25.0/components/prism-javascript.min.js"></script>
+    <script>
+        function generateModel() {
+            const modelName = document.getElementById("modelName").value.trim();
+            const tableName = document.getElementById("tableName").value.trim();
+            const attributesInput = document.getElementById("attributes").value.trim();
+
+            if (!modelName || !tableName || !attributesInput) {
+                alert("Please fill in all fields!");
+                return;
+            }
+
+            const typeMapping = {
+                string: 'string',
+                uuid: 'string',
+                date: 'Date',
+                integer: 'number',
+                boolean: 'boolean',
+            };
+
+            // Function to parse attributes based on flexible input
+            const parseAttributes = (input) => {
+                // Split by either comma or new line
+                const lines = input.split(/[\n,]+/);
+                return lines.map(line => {
+                    const parts = line.trim().split(/[\s:]+/); // Split by space or colon
+                    if (parts.length === 2) {
+                        const [name, type] = parts;
+                        return { name: name.trim(), type: typeMapping[type.trim().toLowerCase()] || 'any' };
+                    }
+                    throw new Error(`Invalid format for attribute: ${line}`);
+                });
+            };
+
+            let attributes;
+            try {
+                attributes = parseAttributes(attributesInput);
+            } catch (error) {
+                alert(error.message);
+                return;
+            }
+
+            // Generate Sequelize Model
+            let sequelizeModel = `
+import {
+    CreationOptional,
+    DataTypes,
+    InferAttributes,
+    InferCreationAttributes,
+    Model,
+} from "sequelize";
+import { sequelize } from "../../sequelize";
+
+export class ${modelName} extends Model<
+    InferAttributes<${modelName}>,
+    InferCreationAttributes<${modelName}>
+> {
+    declare id: CreationOptional<string>;
+`;
+
+            // Add custom attributes between id and createdAt, updatedAt, deletedAt
+            attributes.forEach(attr => {
+                sequelizeModel += `    declare ${attr.name}: ${attr.type};\n`;
+            });
+
+            // Add createdAt, updatedAt, and deletedAt at the bottom
+            sequelizeModel += `    declare createdAt?: CreationOptional<Date>;\n`;
+            sequelizeModel += `    declare updatedAt?: CreationOptional<Date>;\n`;
+            sequelizeModel += `    declare deletedAt?: CreationOptional<Date>;\n`;
+
+            sequelizeModel += `}
+
+${modelName}.init(
+    {
+        id: {
+            type: DataTypes.UUID,
+            defaultValue: DataTypes.UUIDV4,
+            primaryKey: true,
+        },
+`;
+
+            // Add Sequelize fields
+            attributes.forEach(attr => {
+                sequelizeModel += `        ${attr.name}: {\n`;
+                sequelizeModel += `            type: DataTypes.${attr.type.toUpperCase() === 'DATE' ? 'DATE' : 'STRING'},\n`;
+                sequelizeModel += `            allowNull: false,\n`;
+                sequelizeModel += `        },\n`;
+            });
+
+            sequelizeModel += `    },
+    {
+        tableName: "${tableName}",
+        underscored: true,
+        timestamps: true,
+        paranoid: true,
+        sequelize,
+    }
+);
+
+export default ${modelName};`;
+
+            document.getElementById("outputSequelize").textContent = sequelizeModel;
+            Prism.highlightAll();  // Reapply syntax highlighting
+
+            // Generate Domain Model
+            let domainModel = `
+import { Entity } from "../entity";
+
+export interface I${modelName} {
+    id?: string;
+`;
+
+            attributes.forEach(attr => {
+                domainModel += `    ${attr.name}: ${attr.type};\n`;
+            });
+
+            domainModel += `    createdAt?: Date;
+    updatedAt?: Date;
+    deletedAt?: Date;
+}
+
+export class ${modelName} extends Entity<I${modelName}> {
+    constructor(props: I${modelName}) {
+        super(props);
+    }
+
+    public static create(props: I${modelName}): ${modelName} {
+        return new ${modelName}(props);
+    }
+
+    public unmarshal(): I${modelName} {
+        return {
+            id: this.id,
+`;
+
+            attributes.forEach(attr => {
+                domainModel += `            ${attr.name}: this.${attr.name},\n`;
+            });
+
+            domainModel += `            createdAt: this.createdAt,
+            updatedAt: this.updatedAt,
+            deletedAt: this.deletedAt,
+        };
+    }
+
+    get id(): string | undefined {
+        return this.props.id;
+    }
+`;
+
+            attributes.forEach(attr => {
+                domainModel += `    get ${attr.name}(): ${attr.type} {
+        return this.props.${attr.name};
+    }\n`;
+            });
+
+            domainModel += `
+    get createdAt(): Date | undefined {
+        return this.props.createdAt;
+    }
+
+    get updatedAt(): Date | undefined {
+        return this.props.updatedAt;
+    }
+
+    get deletedAt(): Date | undefined {
+        return this.props.deletedAt;
+    }
+}
+`;
+
+            document.getElementById("outputDomain").textContent = domainModel;
+            Prism.highlightAll();  // Reapply syntax highlighting
+        }
+
+        function copyToClipboard(elementId) {
+            const codeElement = document.getElementById(elementId);
+            const textToCopy = codeElement.textContent;
+
+            navigator.clipboard.writeText(textToCopy).then(() => {
+                alert("Code copied to clipboard!");
+            }).catch(err => {
+                console.error("Failed to copy text: ", err);
+            });
+        }
+
+        function toggleDarkMode() {
+            document.body.classList.toggle('dark-mode');
+        }
+    </script>
+
+</body>
+
+</html>
