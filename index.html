@@ -115,23 +115,6 @@
             right: 20px;
             z-index: 1000;
         }
-
-        /* Gaya untuk perangkat mobile */
-        @media (max-width: 768px) {
-            .main-content {
-                flex-direction: column;
-            }
-
-            .form-container,
-            .output-container {
-                width: 100%;
-                /* Lebar penuh untuk tampilan mobile */
-            }
-
-            .code-block {
-                margin-bottom: 20px;
-            }
-        }
     </style>
 </head>
 
@@ -199,23 +182,36 @@
                 return;
             }
 
-            const typeMapping = {
+            const typeMappingSequelize = {
+                string: 'STRING',
+                uuid: 'UUID',
+                date: 'DATE',
+                integer: 'INTEGER',
+                boolean: 'BOOLEAN',
+                double: 'DOUBLE',
+            };
+
+            const typeMappingDeclare = {
                 string: 'string',
                 uuid: 'string',
                 date: 'Date',
                 integer: 'number',
                 boolean: 'boolean',
+                double: 'number',
             };
 
             // Function to parse attributes based on flexible input
             const parseAttributes = (input) => {
-                // Split by either comma or new line
                 const lines = input.split(/[\n,]+/);
                 return lines.map(line => {
-                    const parts = line.trim().split(/[\s:]+/); // Split by space or colon
+                    const parts = line.trim().split(/[\s:]+/);
                     if (parts.length === 2) {
                         const [name, type] = parts;
-                        return { name: name.trim(), type: typeMapping[type.trim().toLowerCase()] || 'any' };
+                        return {
+                            name: name.trim(),
+                            typeSequelize: typeMappingSequelize[type.trim().toLowerCase()] || 'ANY',
+                            typeDeclare: typeMappingDeclare[type.trim().toLowerCase()] || 'any'
+                        };
                     }
                     throw new Error(`Invalid format for attribute: ${line}`);
                 });
@@ -231,25 +227,25 @@
 
             // Generate Sequelize Model
             let sequelizeModel = `
-import {
-    CreationOptional,
-    DataTypes,
-    InferAttributes,
-    InferCreationAttributes,
-    Model,
-} from "sequelize";
-import { sequelize } from "../../sequelize";
-
-export class ${modelName} extends Model<
-    InferAttributes<${modelName}>,
-    InferCreationAttributes<${modelName}>
-> {
-    declare id: CreationOptional<string>;
-`;
+    import {
+        CreationOptional,
+        DataTypes,
+        InferAttributes,
+        InferCreationAttributes,
+        Model,
+    } from "sequelize";
+    import { sequelize } from "../../sequelize";
+    
+    export class ${modelName} extends Model<
+        InferAttributes<${modelName}>,
+        InferCreationAttributes<${modelName}>
+    > {
+        declare id: CreationOptional<string>;
+    `;
 
             // Add custom attributes between id and createdAt, updatedAt, deletedAt
             attributes.forEach(attr => {
-                sequelizeModel += `    declare ${attr.name}: ${attr.type};\n`;
+                sequelizeModel += `    declare ${attr.name}: ${attr.typeDeclare};\n`;
             });
 
             // Add createdAt, updatedAt, and deletedAt at the bottom
@@ -258,105 +254,105 @@ export class ${modelName} extends Model<
             sequelizeModel += `    declare deletedAt?: CreationOptional<Date>;\n`;
 
             sequelizeModel += `}
-
-${modelName}.init(
-    {
-        id: {
-            type: DataTypes.UUID,
-            defaultValue: DataTypes.UUIDV4,
-            primaryKey: true,
-        },
-`;
+    
+    ${modelName}.init(
+        {
+            id: {
+                type: DataTypes.UUID,
+                defaultValue: DataTypes.UUIDV4,
+                primaryKey: true,
+            },
+    `;
 
             // Add Sequelize fields
             attributes.forEach(attr => {
                 sequelizeModel += `        ${attr.name}: {\n`;
-                sequelizeModel += `            type: DataTypes.${attr.type.toUpperCase() === 'DATE' ? 'DATE' : 'STRING'},\n`;
-                sequelizeModel += `            allowNull: false,\n`;
+                sequelizeModel += `            type: DataTypes.${attr.typeSequelize},\n`; // Menggunakan tipe data sesuai inputan
+                sequelizeModel += `            allowNull: false,\n`; // Bisa diubah jika ingin mendukung null values
                 sequelizeModel += `        },\n`;
             });
 
             sequelizeModel += `    },
-    {
-        tableName: "${tableName}",
-        underscored: true,
-        timestamps: true,
-        paranoid: true,
-        sequelize,
-    }
-);
-
-export default ${modelName};`;
+        {
+            tableName: "${tableName}",
+            underscored: true,
+            timestamps: true,
+            paranoid: true,
+            sequelize,
+        }
+    );
+    
+    export default ${modelName};`;
 
             document.getElementById("outputSequelize").textContent = sequelizeModel;
             Prism.highlightAll();  // Reapply syntax highlighting
 
             // Generate Domain Model
             let domainModel = `
-import { Entity } from "../entity";
-
-export interface I${modelName} {
-    id?: string;
-`;
+    import { Entity } from "../entity";
+    
+    export interface I${modelName} {
+        id?: string;
+    `;
 
             attributes.forEach(attr => {
-                domainModel += `    ${attr.name}: ${attr.type};\n`;
+                domainModel += `    ${attr.name}: ${attr.typeDeclare};\n`;
             });
 
             domainModel += `    createdAt?: Date;
-    updatedAt?: Date;
-    deletedAt?: Date;
-}
-
-export class ${modelName} extends Entity<I${modelName}> {
-    constructor(props: I${modelName}) {
-        super(props);
+        updatedAt?: Date;
+        deletedAt?: Date;
     }
-
-    public static create(props: I${modelName}): ${modelName} {
-        return new ${modelName}(props);
-    }
-
-    public unmarshal(): I${modelName} {
-        return {
-            id: this.id,
-`;
+    
+    export class ${modelName} extends Entity<I${modelName}> {
+        constructor(props: I${modelName}) {
+            super(props);
+        }
+    
+        public static create(props: I${modelName}): ${modelName} {
+            return new ${modelName}(props);
+        }
+    
+        public unmarshal(): I${modelName} {
+            return {
+                id: this.id,
+    `;
 
             attributes.forEach(attr => {
                 domainModel += `            ${attr.name}: this.${attr.name},\n`;
             });
 
             domainModel += `            createdAt: this.createdAt,
-            updatedAt: this.updatedAt,
-            deletedAt: this.deletedAt,
-        };
-    }
-
-    get id(): string | undefined {
-        return this.props.id;
-    }
-`;
+                updatedAt: this.updatedAt,
+                deletedAt: this.deletedAt,
+            };
+        }
+    
+        get id(): string | undefined {
+            return this.props.id;
+        }
+    `;
 
             attributes.forEach(attr => {
-                domainModel += `    get ${attr.name}(): ${attr.type} {
-        return this.props.${attr.name};
-    }\n`;
+                domainModel += `    get ${attr.name}(): ${attr.typeDeclare} {
+            return this.props.${attr.name};
+        }\n`;
             });
 
             domainModel += `
-    get createdAt(): Date | undefined {
-        return this.props.createdAt;
+        get createdAt(): Date | undefined {
+            return this.props.createdAt;
+        }
+    
+        get updatedAt(): Date | undefined {
+            return this.props.updatedAt;
+        }
+    
+        get deletedAt(): Date | undefined {
+            return this.props.deletedAt;
+        }
     }
-
-    get updatedAt(): Date | undefined {
-        return this.props.updatedAt;
-    }
-
-    get deletedAt(): Date | undefined {
-        return this.props.deletedAt;
-    }
-}
-`;
+    `;
 
             document.getElementById("outputDomain").textContent = domainModel;
             Prism.highlightAll();  // Reapply syntax highlighting
@@ -377,6 +373,7 @@ export class ${modelName} extends Entity<I${modelName}> {
             document.body.classList.toggle('dark-mode');
         }
     </script>
+
 
 </body>
 
